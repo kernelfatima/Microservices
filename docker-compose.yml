@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  # ---------------- DATABASES & BROKERS ---------------- #
+  postgres:
+    image: postgres:15
+    container_name: user_db
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: user_service_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mongodb:
+    image: mongo:6
+    container_name: product_db
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  redis:
+    image: redis:alpine
+    container_name: redis_cache
+    restart: always
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: message_broker
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672" # Management UI Dashboard
+
+  # ---------------- MICROSERVICES ---------------- #
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - USER_SERVICE_URL=http://user-service:3001
+      - PRODUCT_SERVICE_URL=http://product-service:3002
+    depends_on:
+      - user-service
+      - product-service
+
+  user-service:
+    build: ./user-service
+    container_name: user-service
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - DB_USER=admin
+      - DB_HOST=postgres
+      - DB_NAME=user_service_db
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      - postgres
+      - rabbitmq
+
+  product-service:
+    build: ./product-service
+    container_name: product-service
+    restart: always
+    ports:
+      - "3002:3002"
+    environment:
+      - MONGO_URI=mongodb://admin:password123@mongodb:27017/product_db?authSource=admin
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongodb
+      - redis
+
+  email-service:
+    build: ./email-service
+    container_name: email-service
+    restart: always
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      - rabbitmq
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - api-gateway
+
+volumes:
+  postgres_data:
+  mongodb_data:

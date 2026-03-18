@@ -1,0 +1,49 @@
+name: MicroStore Enterprise CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js Environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: Build API Gateway Docker Image
+      run: docker build -t myregistry/api-gateway ./api-gateway
+
+    - name: Build User Auth Service Image
+      run: docker build -t myregistry/user-service ./user-service
+
+    - name: Build Product Service Image
+      run: docker build -t myregistry/product-service ./product-service
+
+    - name: Build Background Email Worker Image
+      run: docker build -t myregistry/email-service ./email-service
+
+    - name: Build Vite React Frontend Image
+      run: docker build -t myregistry/frontend ./frontend
+
+    - name: Run Complete Cluster Integration Test (Docker Compose)
+      run: |
+        # Initialize the entire 6-container architecture on the GitHub Runner!
+        docker-compose up -d
+        
+        # Give the network and databases 15 seconds to safely boot
+        sleep 15
+        
+        # Verify containers are all running
+        docker ps
+        
+        # Curl the API Gateway Health endpoint to statically prove the backend works
+        curl -f http://localhost:3000/health || exit 1
