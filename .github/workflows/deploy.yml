@@ -37,7 +37,7 @@ jobs:
     - name: Run Complete Cluster Integration Test (Docker Compose)
       run: |
         # Initialize the entire 6-container architecture on the GitHub Runner!
-        docker-compose up -d
+        docker compose up -d
         
         # Give the network and databases 15 seconds to safely boot
         sleep 15
